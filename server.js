@@ -78,7 +78,7 @@ function promptUser() {
                     getEmployeeDepartment();
                 };
                 if (choiceResponse === 'Cancel') {
-                    process.cancel();
+                    process.exit();
                 };
             });
     };
@@ -274,8 +274,119 @@ function promptUser() {
         
         db.query(updatedRoleDb, (err, res) => {
             if(err) throw err;
-            const 
-        })
-    }
+
+            const employeeName = rows.map(({ first_name, last_name, id }) => ({ name: `${first_name} ${last_name}`, value: id }));
+\            inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'employee',
+                    message: 'Choose employee to update',
+                    choices: employeeName,
+                }
+            ])
+            .then(employeeChoice => {
+                const name = employeeChoice.name;
+                const list = [ ];
+                list.push(name);
+
+                const roleChoice = `SELECT * FROM role`;
+
+                db.query(roleChoice, (err, roles) => {
+                    if(err) throw err;
+
+                    const roleOptions = roles.map(({ id, title }) => ({ name: title, value: id }));
+                    inquirer.prompt([
+                        {
+                            type: 'list',
+                            name: 'role',
+                            message: 'Choose the new role',
+                            choices: roleOptions,
+                        }
+                    ])
+                    .then(roleSelected => {
+                        const role = roleSelected.role;
+                        list.push(role);
+
+                        const empUpdates = list[0]
+                        list[0] = role
+                        list[1] = name
+
+                        const newId = `UPDATE employee SET role_id = ? WHERE id = ?`;
+                        db.query(newId, list, (err, result) => {
+                            if(err) throw err;
+                            console.log('Employee role updated successfully');
+
+                            viewEmployees();
+                        })
+                    })
+                });
+            });
+        });
+    };
+
+    function getEmployeeManager() {
+        const managerDb = `SELECT first_name, last_name, id FROM emplpoyees`;
+        db.query(managerDb, (err, response) => {
+            if(err) throw err;
+
+            const employeeOptions = response.map(({ first_name, last_name, id }) => ({ name: `${first_name} ${last_name}`, value: id }));
+            inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'employee',
+                    message: 'Choose the employee manager',
+                    choices: employeeOptions,
+                }
+            ])
+            .then(managerSelected => {
+                const managerName = managerSelected.managerName; 
+                const choiceDb = `SELECT first_name, last_name FROM employees
+                WHERE manager_id = ?`
+
+                db.query(managerName, choiceDb, (err, results) => {
+                    if(err) throw err;
+                    console.log('Viewing employees under manager');
+                    console.table(results);
+
+                    questions();
+                })
+            });
+        });
+    };
+
+    function getEmployeeDepartment() {
+        const byDeptDb = `SELECT * FROM departments`;
+        db.query(byDeptDb, (err, results) => {
+            if(err) throw(err);
+            
+            const depts = results.map (({ name, id }) => ({ name: name, value: id }));
+            inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'employees',
+                    message: 'Choose the department to search by',
+                    choices: depts,
+                }
+            ])
+            .then(deptResponse => {
+                const deptChoice = deptResponse.deptChoice; 
+                const deptDb = `SELECT employees.id, first_name, last_name, departments.name AS department
+                FROM employees
+                LEFT JOIN roles ON employees.roles_id = roles.id
+                LEFT JOIN departments ON roles.department_id = departments.id
+                WHERE departments.id = ?`;
+
+                db.query(deptChoice, deptDb, (err, results) => {
+                    if(err) throw err;
+
+                    console.table(results);
+
+                    questions();
+                });
+            });
+        });
+    };
+
+
 }
 
