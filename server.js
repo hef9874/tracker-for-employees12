@@ -13,7 +13,7 @@ const db = mysql.createConnection(
     {
         host: "127.0.0.1",
         user: "root",
-        password: "",
+        password: process.env.DB_PASSWORD,
         database: "company_db",
     },
     console.log('Database connected')
