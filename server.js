@@ -3,11 +3,16 @@ const mysql = require('mysql2');
 const express = require('express');
 require("console.table");
 
+require('dotenv').config();
+
 const PORT = process.env.PORT || 3001;
 const app = express();
-
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+
+app.use((req, res) => {
+    res.status(404).end();
+});
 
 const db = mysql.createConnection(
     {
@@ -21,10 +26,10 @@ const db = mysql.createConnection(
 
 db.connect(err => {
     if (err) throw err;
-    startQs();
+    questions();
 })
 
-function promptUser() {
+// function startQs() {
 
     //Setting up choices
     const questions = () => {
@@ -97,12 +102,13 @@ function promptUser() {
     };
 
     function viewRoles() {
-        const roles = `SELECT roles.id
-        roles.title,
-        roles.salary,
-        departments.name AS department
+        const roles = `SELECT roles.id, 
+        roles.title, 
+        roles.salary, 
+        departments.name AS departments
         FROM roles
         LEFT JOIN departments ON roles.department_id = departments.id`;
+
         db.query(roles, (err, res) => {
             if (err) throw err;
             console.log("Roles - ")
@@ -113,18 +119,18 @@ function promptUser() {
     };
 
     function viewEmployees() {
-        const employees = `SELECT employees.id,
-        employees.first_name,
+        const employees = `SELECT employees.id, 
+        employees.first_name, 
         employees.last_name,
         roles.title AS title,
         roles.salary AS salary,
         departments.name AS department,
-        CONCAT (manager.first_name, " ", manager.last_name) AS manager
+        CONCAT (manager.first_name, " ", manager.last_name) AS manager 
         FROM employees
-        LEFT JOIN roles ON employees.role_id = roles.id,
-        LEFT JOIN departments ON roles.department_id = departments.id,
-        LEFT JOIN employees manager ON employees.manager_id.manager.id
-        `;
+        LEFT JOIN roles ON employees.role_id = roles.id
+        LEFT JOIN departments ON roles.department_id = departments.id
+        LEFT JOIN employees manager ON employees.manager_id = manager.id`;
+
         db.query(employees, (err, res) => {
             if (err) throw err;
             console.log("Employees - ")
@@ -172,7 +178,7 @@ function promptUser() {
         ])
             .then((answer) => {
                 const newSalary = [answer.role, answer.salary];
-                const role = `SELECT name, id FROM department`;
+                const role = `SELECT name, id FROM departments`;
 
                 db.query(role, (err, response) => {
                     if (err) throw err;
@@ -189,7 +195,7 @@ function promptUser() {
                         .then(deptChoice => {
                             const department = deptChoice.department;
                             newSalary.push(department);
-                            const roleChoice = `INSERT INTO role (title, salary, department_id) 
+                            const roleChoice = `INSERT INTO roles (title, salary, department_id) 
                     VALUES (?, ?, ?)`;
 
                             db.query(roleChoice, newSalary, (err, res) => {
@@ -200,7 +206,7 @@ function promptUser() {
                 });
             });
     };
-//Adding employee to employee db
+    //Adding employee to employee db
     function addEmployee() {
         inquirer.prompt([
             {
@@ -271,12 +277,12 @@ function promptUser() {
     //update employee's role in db
     function updateEmployeeRole() {
         const updatedRoleDb = `SELECT first_name, last_name, id FROM employees`;
-        
-        db.query(updatedRoleDb, (err, res) => {
-            if(err) throw err;
 
-            const employeeName = rows.map(({ first_name, last_name, id }) => ({ name: `${first_name} ${last_name}`, value: id }));
-\            inquirer.prompt([
+        db.query(updatedRoleDb, (err, res) => {
+            if (err) throw err;
+
+            const employeeName = res.map(({ first_name, last_name, id }) => ({ name: `${first_name} ${last_name}`, value: id }));
+            inquirer.prompt([
                 {
                     type: 'list',
                     name: 'employee',
@@ -284,50 +290,50 @@ function promptUser() {
                     choices: employeeName,
                 }
             ])
-            .then(employeeChoice => {
-                const name = employeeChoice.name;
-                const list = [ ];
-                list.push(name);
+                .then(employeeChoice => {
+                    const name = employeeChoice.name;
+                    const list = [];
+                    list.push(name);
 
-                const roleChoice = `SELECT * FROM role`;
+                    const roleChoice = `SELECT * FROM roles`;
 
-                db.query(roleChoice, (err, roles) => {
-                    if(err) throw err;
+                    db.query(roleChoice, (err, roles) => {
+                        if (err) throw err;
 
-                    const roleOptions = roles.map(({ id, title }) => ({ name: title, value: id }));
-                    inquirer.prompt([
-                        {
-                            type: 'list',
-                            name: 'role',
-                            message: 'Choose the new role',
-                            choices: roleOptions,
-                        }
-                    ])
-                    .then(roleSelected => {
-                        const role = roleSelected.role;
-                        list.push(role);
+                        const roleOptions = roles.map(({ id, title }) => ({ name: title, value: id }));
+                        inquirer.prompt([
+                            {
+                                type: 'list',
+                                name: 'role',
+                                message: 'Choose the new role',
+                                choices: roleOptions,
+                            }
+                        ])
+                            .then(roleSelected => {
+                                const role = roleSelected.role;
+                                list.push(role);
 
-                        const empUpdates = list[0]
-                        list[0] = role
-                        list[1] = name
+                                const empUpdates = list[0]
+                                list[0] = role
+                                list[1] = name
 
-                        const newId = `UPDATE employee SET role_id = ? WHERE id = ?`;
-                        db.query(newId, list, (err, result) => {
-                            if(err) throw err;
-                            console.log('Employee role updated successfully');
+                                const newId = `UPDATE employee SET role_id = ? WHERE id = ?`;
+                                db.query(newId, list, (err, result) => {
+                                    if (err) throw err;
+                                    console.log('Employee role updated successfully');
 
-                            viewEmployees();
-                        })
-                    })
+                                    viewEmployees();
+                                })
+                            })
+                    });
                 });
-            });
         });
     };
 
     function getEmployeeManager() {
         const managerDb = `SELECT first_name, last_name, id FROM emplpoyees`;
         db.query(managerDb, (err, response) => {
-            if(err) throw err;
+            if (err) throw err;
 
             const employeeOptions = response.map(({ first_name, last_name, id }) => ({ name: `${first_name} ${last_name}`, value: id }));
             inquirer.prompt([
@@ -338,28 +344,28 @@ function promptUser() {
                     choices: employeeOptions,
                 }
             ])
-            .then(managerSelected => {
-                const managerName = managerSelected.managerName; 
-                const choiceDb = `SELECT first_name, last_name FROM employees
+                .then(managerSelected => {
+                    const managerName = managerSelected.managerName;
+                    const choiceDb = `SELECT first_name, last_name FROM employees
                 WHERE manager_id = ?`
 
-                db.query(managerName, choiceDb, (err, results) => {
-                    if(err) throw err;
-                    console.log('Viewing employees under manager');
-                    console.table(results);
+                    db.query(managerName, choiceDb, (err, results) => {
+                        if (err) throw err;
+                        console.log('Viewing employees under manager');
+                        console.table(results);
 
-                    questions();
-                })
-            });
+                        questions();
+                    })
+                });
         });
     };
 
     function getEmployeeDepartment() {
         const byDeptDb = `SELECT * FROM departments`;
         db.query(byDeptDb, (err, results) => {
-            if(err) throw(err);
-            
-            const depts = results.map (({ name, id }) => ({ name: name, value: id }));
+            if (err) throw (err);
+
+            const depts = results.map(({ name, id }) => ({ name: name, value: id }));
             inquirer.prompt([
                 {
                     type: 'list',
@@ -368,25 +374,24 @@ function promptUser() {
                     choices: depts,
                 }
             ])
-            .then(deptResponse => {
-                const deptChoice = deptResponse.deptChoice; 
-                const deptDb = `SELECT employees.id, first_name, last_name, departments.name AS department
+                .then(deptResponse => {
+                    const deptChoice = deptResponse.deptChoice;
+                    const deptDb = `SELECT employees.id, first_name, last_name, departments.name AS department
                 FROM employees
                 LEFT JOIN roles ON employees.roles_id = roles.id
                 LEFT JOIN departments ON roles.department_id = departments.id
                 WHERE departments.id = ?`;
 
-                db.query(deptChoice, deptDb, (err, results) => {
-                    if(err) throw err;
+                    db.query(deptChoice, deptDb, (err, results) => {
+                        if (err) throw err;
 
-                    console.table(results);
+                        console.table(results);
 
-                    questions();
+                        questions();
+                    });
                 });
-            });
         });
     };
 
-
-}
+// }
 
